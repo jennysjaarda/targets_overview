@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Targets Overview</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Jenny Sjaarda" />
+    <script src="presentation_files/header-attrs/header-attrs.js"></script>
+    <link href="presentation_files/remark-css/default.css" rel="stylesheet" />
+    <link href="presentation_files/remark-css/default-fonts.css" rel="stylesheet" />
+    <script src="presentation_files/htmlwidgets/htmlwidgets.js"></script>
+    <link href="presentation_files/vis/vis-network.min.css" rel="stylesheet" />
+    <script src="presentation_files/vis/vis-network.min.js"></script>
+    <script src="presentation_files/visNetwork-binding/visNetwork.js"></script>
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Targets Overview
+### Jenny Sjaarda
+
+---
+
+&lt;style&gt;
+.inverse {
+background-color: transparent;
+text-shadow: 0 0 0px transparent;
+}
+.title-slide {
+vertical-align: bottom !important; 
+text-align: center !important;
+}
+.title-slide h1 {
+position: absolute;
+top: 0;
+left: 0;
+right: 0;
+width: 100%;
+line-height: 4em;
+color: #666666;
+}
+.title-slide h3 {
+line-height: 6em;
+color: #666666;
+}
+.title-slide {
+background-color: white;
+background-image: url('images/logo.png');
+background-repeat: no-repeat;
+background-size: 25%;
+}
+.remark-slide-content:after {
+content: "19-11-2021 (updated 19-11-2021)";
+position: absolute;
+bottom: -5px;
+left: 10px;
+height: 40px;
+width: 100%;
+font-family: Helvetica, Arial, sans-serif;
+font-size: 0.7em;
+color: gray;
+background-repeat: no-repeat;
+background-size: contain;
+}
+&lt;/style&gt;
+
+
+
+
+
+
+## What is `targets`? 
+
+- The targets R package is a [Make](https://www.gnu.org/software/make/)-like pipeline toolkit for Statistics and data science in R. 
+
+--
+
+- *Purpose*: maintain a reproducible workflow without repeating yourself.
+
+--
+
+- `targets` automatically learns how your pipeline fits together. 
+
+--
+
+- `targets` accelerates analysis with:
+    - Easy-to-configure parallel computing.
+    - Enhanced reproducibility.
+    - Reduced burdens of repeated computation and manual data micromanagement.
+--
+
+- A fully up-to-date targets pipeline is tangible evidence that the output aligns with the code and data, which substantiates trust in the results. 
+
+---
+
+# Motivation
+
+- Data science can be slow. 
+--
+
+- A single round of statistical computation can take several minutes, hours, or even days to complete. 
+--
+
+- Typical workflows looks like this: 
+  1. Launch the code.
+  2. Wait while it runs.
+  3. Discover an issue.
+  4. Restart from scratch.
+
+--
+- The `targets` R package keeps results up to date and reproducible while minimizing the number of expensive tasks that actually run. 
+
+--
+- `targets` arranges the steps of your pipeline, skips costly runtime for steps that are already up to date, runs the rest with optional implicit parallel computing, abstracts files as R objects, and shows tangible evidence that the output matches the underlying code and data. 
+
+--
+- In other words, the package saves time while increasing your ability to trust the results. 
+
+--
+- Most pipeline tolkits are not language specific or are Python-focused, while the `targts` package allows you to work complete in R. 
+
+---
+
+## Repetition: the overlooked bane of long computation
+
+&lt;br&gt;
+
+![](./images/reality.png)
+
+---
+
+# Getting started 
+
+Install the **`targets`**:
+
+Type | Source | Command
+---|---|---
+Release | CRAN | `install.packages("targets")`
+Development | GitHub | `remotes::install_github("ropensci/targets")`
+Development | rOpenSci | `install.packages("targets", repos = "https://dev.ropensci.org")`
+
+---
+
+# File structure of a `targets` project
+
+In a `targets` project, the parent folder **must** contain a `_targets.R` file and *typically* a `R/function.R` file. 
+
+Otherwise, the project can be organized as you prefer, for example: 
+
+
+```r
+├── _targets.R
+├── R/
+├──── functions.R
+├── data/
+└──── raw_data.csv
+├── docs/
+├── analysis/
+├── output/
+├── renv/
+├── git/
+README.md
+.gitignore
+```
+
+---
+
+# Target script file
+
+- Files `raw_data.csv` and `functions.R` are typical user-defined components of a project-oriented workflow, but the target script file `_targets.R` file is special. 
+--
+
+- Every targets workflow needs a target script file to formally define the targets in the pipeline. 
+--
+
+- By default, the target script is a file called `_targets.R` in the project’s root directory. 
+--
+
+- Requirements: 
+  1. Load the `targets` package.
+  2. Load your custom function and global objects into the R session. 
+  3. Call `tar_option_set()` to set the default settings for all you targets, such as the names of required packages and the data storage format. Individual targets can override these settings.
+  4. Define individual targets with the `tar_target()` function. Each target is an intermediate step of the workflow. At minimum, a target must have a name and an R expression. 
+  5. Every target script must end with a list of your tar_target() objects. 
+  
+---
+
+An example `_targets.R` file: 
+
+
+```r
+library(targets) # requirement 1: load the package.
+source("R/functions.R") # requirement 2: load custom functions.
+source("R/settings.R") # requirement 2: load custom settings.
+tar_option_set(packages = c("biglm", "tidyverse")) 
+# requirement 3: call `tar_option_set`.
+list( # requirement 4: define all your targets with `tar_target()`. 
+  tar_target( 
+    raw_data_file,
+    "data/raw_data.csv",
+    format = "file"
+  ),
+  tar_target(
+    raw_data,
+    read_csv(raw_data_file, col_types = cols())
+  ),
+  tar_target(
+    data,
+    raw_data %&gt;%
+      filter(!is.na(Ozone))
+  ),
+  tar_target(hist, create_plot(data)),
+  tar_target(fit, biglm(Ozone ~ Wind + Temp, data))
+) # requirement 5: encapsulate all these targets in a list
+```
+
+---
+
+## Inspect the pipeline
+
+`tar_manifest()` shows you a data frame information about the targets, and it has functionality to specify the targets and columns returned.
+
+
+
+```r
+tar_manifest(fields = "command")
+#&gt; # A tibble: 5 x 2
+#&gt;   name          command                                      
+#&gt;   &lt;chr&gt;         &lt;chr&gt;                                        
+#&gt; 1 raw_data_file "\"data/raw_data.csv\""                      
+#&gt; 2 raw_data      "read_csv(raw_data_file, col_types = cols())"
+#&gt; 3 data          "raw_data %&gt;% filter(!is.na(Ozone))"         
+#&gt; 4 fit           "biglm(Ozone ~ Wind + Temp, data)"           
+#&gt; 5 hist          "create_plot(data)"
+```
+
+---
+
+## Inspect the pipeline
+
+There are also graphical displays with `tar_glimpse()`.
+
+
+```r
+tar_glimpse()
+```
+
+<div id="htmlwidget-02d926c0ca6996a69e6a" style="width:504px;height:504px;" class="visNetwork html-widget"></div>
+<script type="application/json" data-for="htmlwidget-02d926c0ca6996a69e6a">{"x":{"nodes":{"name":["raw_data","fit","hist","raw_data_file","data"],"type":["stem","stem","stem","stem","stem"],"status":["none","none","none","none","none"],"seconds":[null,null,null,null,null],"bytes":[null,null,null,null,null],"branches":[null,null,null,null,null],"id":["raw_data","fit","hist","raw_data_file","data"],"label":["raw_data","fit","hist","raw_data_file","data"],"level":[2,4,4,1,3],"color":["#94a4ac","#94a4ac","#94a4ac","#94a4ac","#94a4ac"],"shape":["dot","dot","dot","dot","dot"]},"edges":{"from":["raw_data_file","data","data","raw_data"],"to":["raw_data","fit","hist","data"],"arrows":["to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Stem"],"shape":["dot"],"color":["#899DA4"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
+
+---
+
+## Inspect the pipeline
+
+For more comprehensive visualization, use: `tar_visnetwork()`.
+
+
+```r
+tar_visnetwork()
+```
+
+<div id="htmlwidget-2d86a089c0e30c1a852e" style="width:504px;height:504px;" class="visNetwork html-widget"></div>
+<script type="application/json" data-for="htmlwidget-2d86a089c0e30c1a852e">{"x":{"nodes":{"name":["data","fit","hist","raw_data","raw_data_file","create_plot"],"type":["stem","stem","stem","stem","stem","function"],"status":["outdated","outdated","outdated","outdated","outdated","outdated"],"seconds":[null,null,null,null,null,null],"bytes":[null,null,null,null,null,null],"branches":[null,null,null,null,null,null],"id":["data","fit","hist","raw_data","raw_data_file","create_plot"],"label":["data","fit","hist","raw_data","raw_data_file","create_plot"],"level":[3,4,4,2,1,1],"color":["#78B7C5","#78B7C5","#78B7C5","#78B7C5","#78B7C5","#78B7C5"],"shape":["dot","dot","dot","dot","dot","triangle"]},"edges":{"from":["raw_data_file","data","create_plot","data","raw_data"],"to":["raw_data","fit","hist","hist","data"],"arrows":["to","to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Outdated","Stem","Function"],"color":["#78B7C5","#899DA4","#899DA4"],"shape":["dot","dot","triangle"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
+
+???
+
+This DAG is indifferent to the order of targets in your pipeline. You will still get the same graph even if you rearrange them. This is because targets uses static code analysis to detect the dependencies of each target, and this process does not depend on target order. 
+
+---
+
+## Run the pipeline
+
+The `tar_make()` function runs the workflow. 
+
+--
+
+It creates a fresh clean external R process, reads the target script to learn about the pipeline, runs the correct targets in the correct order given by the graph, and saves the necessary data to the `_targets/` data store.
+--
+
+
+```r
+tar_make()
+#&gt; • start target raw_data_file
+#&gt; • built target raw_data_file
+#&gt; • start target raw_data
+#&gt; • built target raw_data
+#&gt; • start target data
+#&gt; • built target data
+#&gt; • start target fit
+#&gt; • built target fit
+#&gt; • start target hist
+#&gt; • built target hist
+#&gt; • end pipeline
+```
+
+---
+
+## Run the pipeline
+
+The next time you run `tar_make()`, targets skips everything that is already up to date, which saves a lot of time in large projects with long runtimes.
+
+
+```r
+tar_make()
+#&gt; ✓ skip target raw_data_file
+#&gt; ✓ skip target raw_data
+#&gt; ✓ skip target data
+#&gt; ✓ skip target fit
+#&gt; ✓ skip target hist
+#&gt; ✓ skip pipeline
+```
+
+---
+
+## Run the pipeline
+
+We can use `tar_visnetwork()` and `tar_outdated()` to check ahead of time which targets are up to date.
+
+
+```r
+tar_outdated()
+#&gt; character(0)
+tar_visnetwork()
+```
+
+<div id="htmlwidget-5bf7227088dcd4c23c07" style="width:504px;height:504px;" class="visNetwork html-widget"></div>
+<script type="application/json" data-for="htmlwidget-5bf7227088dcd4c23c07">{"x":{"nodes":{"name":["data","fit","hist","raw_data","raw_data_file","create_plot"],"type":["stem","stem","stem","stem","stem","function"],"status":["uptodate","uptodate","uptodate","uptodate","uptodate","uptodate"],"seconds":[0.005,0.002,0.006,0.062,0.014,null],"bytes":[1353,1826,44861,1524,2890,null],"branches":[null,null,null,null,null,null],"id":["data","fit","hist","raw_data","raw_data_file","create_plot"],"label":["data","fit","hist","raw_data","raw_data_file","create_plot"],"level":[3,4,4,2,1,1],"color":["#354823","#354823","#354823","#354823","#354823","#354823"],"shape":["dot","dot","dot","dot","dot","triangle"]},"edges":{"from":["raw_data_file","data","create_plot","data","raw_data"],"to":["raw_data","fit","hist","hist","data"],"arrows":["to","to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Up to date","Stem","Function"],"color":["#354823","#899DA4","#899DA4"],"shape":["dot","dot","triangle"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
+
+---
+
+## Monitoring the pipeline
+
+To monitor the build progress of your `targets` while `tar_make()` is running, you can open a new R session and run `tar_progress()`. 
+
+It reads the spreadsheet in `_targets/meta/progress` and tells you which targets are running, built, errored, or cancelled.
+
+
+
+
+```r
+tar_progress()
+#&gt; # A tibble: 5 x 2
+#&gt;   name          progress
+#&gt;   &lt;chr&gt;         &lt;chr&gt;   
+#&gt; 1 raw_data_file built   
+#&gt; 2 raw_data      built   
+#&gt; 3 data          built   
+#&gt; 4 fit           built   
+#&gt; 5 hist          built
+```
+
+---
+
+## Changes to the pipeline
+
+The `targets` package notices when you make changes to code and data, and those changes affect which targets rerun and which targets are skipped. 
+
+If you change one of your *functions*, the targets that depend on it will no longer be up to date, and `tar_make()` will rebuild them. 
+
+Below we change the function `create_plot` to include a `bins` parameter. 
+
+
+```r
+# Old functions.R.
+create_plot &lt;- function(data) {
+    ggplot(data) + geom_histogram(aes(x = Ozone)) +
+    theme_gray(24)
+}
+
+```
+
+
+
+
+
+```r
+# Edit functions.R.
+create_plot &lt;- function(data) {
+  ggplot(data) +
+    geom_histogram(aes(x = Ozone), bins = 10) + # Set number of bins
+    theme_gray(24)
+}
+```
+
+---
+
+## Changes to the pipeline
+
+`targets` detects the change. `hist` is outdated (as would be any targets downstream of hist) and the others are still up to date.
+
+
+```r
+tar_visnetwork()
+```
+
+<div id="htmlwidget-fd6c937e50fe57152ce3" style="width:504px;height:504px;" class="visNetwork html-widget"></div>
+<script type="application/json" data-for="htmlwidget-fd6c937e50fe57152ce3">{"x":{"nodes":{"name":["data","fit","hist","raw_data","raw_data_file","create_plot"],"type":["stem","stem","stem","stem","stem","function"],"status":["uptodate","uptodate","outdated","uptodate","uptodate","outdated"],"seconds":[0.004,0.002,0.005,0.055,0.013,null],"bytes":[1353,1826,44861,1524,2890,null],"branches":[null,null,null,null,null,null],"id":["data","fit","hist","raw_data","raw_data_file","create_plot"],"label":["data","fit","hist","raw_data","raw_data_file","create_plot"],"level":[3,4,4,2,1,1],"color":["#354823","#354823","#78B7C5","#354823","#354823","#78B7C5"],"shape":["dot","dot","dot","dot","dot","triangle"]},"edges":{"from":["raw_data_file","data","create_plot","data","raw_data"],"to":["raw_data","fit","hist","hist","data"],"arrows":["to","to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Up to date","Outdated","Stem","Function"],"color":["#354823","#78B7C5","#899DA4","#899DA4"],"shape":["dot","dot","dot","triangle"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
+
+```r
+tar_outdated()
+#&gt; [1] "hist"
+```
+
+---
+
+## Changes to the pipeline
+
+That means `tar_make()` reruns hist and nothing else.
+
+
+```r
+tar_make()
+#&gt; ✓ skip target raw_data_file
+#&gt; ✓ skip target raw_data
+#&gt; ✓ skip target data
+#&gt; ✓ skip target fit
+#&gt; • start target hist
+#&gt; • built target hist
+#&gt; • end pipeline
+```
+
+---
+
+## Changes to the pipeline
+
+- Similarly, if we change the data file `raw_data.csv`, `targets` notices the change. 
+- This is because `raw_data_file` is a dynamic file (i.e. `tar_target(format = "file")`) that returned `"raw_data.csv"`. 
+- Let’s try it out. Below, let’s use only the first 100 rows of the `airquality` dataset.
+
+Recall that our first target looked like this, with `format = "file"`: 
+
+
+```r
+tar_target(
+    raw_data_file,
+    "data/raw_data.csv",
+    format = "file",
+    deployment = "main"
+  )
+```
+
+---
+
+## Changes to the pipeline
+
+If we change data let's see what happens.
+
+
+```r
+write_csv(head(airquality, n = 100), "data/raw_data.csv")
+tar_visnetwork()
+```
+
+<div id="htmlwidget-5db78960f4013e01a33b" style="width:504px;height:504px;" class="visNetwork html-widget"></div>
+<script type="application/json" data-for="htmlwidget-5db78960f4013e01a33b">{"x":{"nodes":{"name":["data","fit","hist","raw_data","raw_data_file","create_plot"],"type":["stem","stem","stem","stem","stem","function"],"status":["outdated","outdated","outdated","outdated","outdated","uptodate"],"seconds":[0.004,0.002,0.021,0.055,0.013,null],"bytes":[1353,1826,44871,1524,2890,null],"branches":[null,null,null,null,null,null],"id":["data","fit","hist","raw_data","raw_data_file","create_plot"],"label":["data","fit","hist","raw_data","raw_data_file","create_plot"],"level":[3,4,4,2,1,1],"color":["#78B7C5","#78B7C5","#78B7C5","#78B7C5","#78B7C5","#354823"],"shape":["dot","dot","dot","dot","dot","triangle"]},"edges":{"from":["raw_data_file","data","create_plot","data","raw_data"],"to":["raw_data","fit","hist","hist","data"],"arrows":["to","to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Outdated","Up to date","Stem","Function"],"color":["#78B7C5","#354823","#899DA4","#899DA4"],"shape":["dot","dot","dot","triangle"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
+
+Now everything is out of date, because the input file changed. 
+
+---
+
+## Reading targets
+
+`targets` has a convenient functions `tar_read()` and `tar_load` to read your targets from the `_targets/` data store.
+
+
+```r
+tar_read(raw_data)
+#&gt; # A tibble: 153 x 6
+#&gt;    Ozone Solar.R  Wind  Temp Month   Day
+#&gt;    &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+#&gt;  1    41     190   7.4    67     5     1
+#&gt;  2    36     118   8      72     5     2
+#&gt;  3    12     149  12.6    74     5     3
+#&gt;  4    18     313  11.5    62     5     4
+#&gt;  5    NA      NA  14.3    56     5     5
+#&gt;  6    28      NA  14.9    66     5     6
+#&gt;  7    23     299   8.6    65     5     7
+#&gt;  8    19      99  13.8    59     5     8
+#&gt;  9     8      19  20.1    61     5     9
+#&gt; 10    NA     194   8.6    69     5    10
+#&gt; # … with 143 more rows
+```
+
+---
+
+## Reading targets
+
+
+```r
+tar_read(hist)
+```
+
+&lt;img src="presentation_files/figure-html/unnamed-chunk-21-1.png" width="50%" /&gt;
+
+---
+
+## Reading targets
+
+
+```r
+
+tar_load(raw_data)
+ls()
+#&gt; [1] "raw_data"
+raw_data
+#&gt; # A tibble: 153 x 6
+#&gt;    Ozone Solar.R  Wind  Temp Month   Day
+#&gt;    &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+#&gt;  1    41     190   7.4    67     5     1
+#&gt;  2    36     118   8      72     5     2
+#&gt;  3    12     149  12.6    74     5     3
+#&gt;  4    18     313  11.5    62     5     4
+#&gt;  5    NA      NA  14.3    56     5     5
+#&gt;  6    28      NA  14.9    66     5     6
+#&gt;  7    23     299   8.6    65     5     7
+#&gt;  8    19      99  13.8    59     5     8
+#&gt;  9     8      19  20.1    61     5     9
+#&gt; 10    NA     194   8.6    69     5    10
+#&gt; # … with 143 more rows
+```
+
+---
+
+## Target construction
+
+Like a good function, a good target generally does one of three things:
+
+1. Create a dataset.
+2. Analyze a dataset with a model.
+3. Summarize an analysis or dataset.
+
+If a function gets too long, split it into nested sub-functions that make your larger function easier to read and maintain.
+
+Build up the pipeline *gradually*. 
+
+---
+
+## Target construction
+
+The `targets` package automatically skips targets that are already up to date, so it is best to define targets that maximize time savings. Good targets usually:
+--
+
+- Are large enough to subtract a decent amount of runtime when skipped.
+--
+
+- Are small enough that some targets can be skipped even if others need to run.
+--
+
+- Invoke no side effects such as modifications to the global environment. (But targets with `tar_target(format = "file")` can save files.)
+--
+
+- Return a single value that is:
+    - Easy to understand and interpret. 
+    - Meaningful to the project. 
+    - Easy to save as a file, e.g. with `readRDS()`. 
+
+---
+
+## Jobs outside of R
+
+- Each target runs R code, so to invoke a tool outside R, use:
+  - `system2()`
+  - [`processx`](https://processx.r-lib.org) to call the appropriate system commands. 
+- This allows you to run shell scripts, Python scripts, etc. from within R. 
+- External scripts should ideally be tracked as input files using `tar_target(format = "file")`. 
+
+---
+
+## Branching
+
+- Sometimes, a pipeline contains more targets than a user can comfortably type by hand. 
+
+--
+
+- For projects with hundreds of targets, branching can make the `_targets.R` file more concise and easier to read and maintain.
+
+--
+
+- **Dynamic branching**: used to define new targets (i.e. branches) while the pipeline is running. Prior to launching the pipeline, the user does not necessarily know which branches will spawn or how many branches there will be, and each branch’s inputs are determined at the last minute.
+
+--
+
+- **Static branching**: used when iterating over a known set of branches (or parameters) before the pipeline starts. 
+
+---
+
+## Branching patterns
+
+To use dynamic branching, set the `pattern` argument of `tar_target()`. 
+
+
+
+
+```r
+# _targets.R
+library(targets)
+list(
+  tar_target(w, c(1, 2)),
+  tar_target(x, c(10, 20)),
+  tar_target(y, w + x, pattern = map(w, x)),
+  tar_target(z, sum(y)),
+  tar_target(z2, length(y), pattern = map(y))
+)
+```
+
+---
+
+## Branching patterns
+
+Visualize the branched network.
+
+
+```r
+tar_visnetwork()
+```
+
+<div id="htmlwidget-00dec23b8dc54aecee68" style="width:504px;height:504px;" class="visNetwork html-widget"></div>
+<script type="application/json" data-for="htmlwidget-00dec23b8dc54aecee68">{"x":{"nodes":{"name":["w","x","y","z","z2"],"type":["stem","stem","pattern","stem","pattern"],"status":["outdated","outdated","outdated","outdated","outdated"],"seconds":[null,null,null,null,null],"bytes":[null,null,null,null,null],"branches":[null,null,null,null,null],"id":["w","x","y","z","z2"],"label":["w","x","y","z","z2"],"level":[1,1,2,3,3],"color":["#78B7C5","#78B7C5","#78B7C5","#78B7C5","#78B7C5"],"shape":["dot","dot","square","dot","square"]},"edges":{"from":["y","w","x","y"],"to":["z2","y","y","z"],"arrows":["to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Outdated","Stem","Pattern"],"color":["#78B7C5","#899DA4","#899DA4"],"shape":["dot","dot","square"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
+
+---
+
+## Branching patterns
+
+Build the pipeline. Notice the multiple `y_********` and `z2_********` targets that are created. 
+
+
+```r
+tar_make()
+#&gt; • start target w
+#&gt; • built target w
+#&gt; • start target x
+#&gt; • built target x
+#&gt; • start branch y_61ced14d
+#&gt; • built branch y_61ced14d
+#&gt; • start branch y_4096b6a8
+#&gt; • built branch y_4096b6a8
+#&gt; • built pattern y
+#&gt; • start branch z2_275d234a
+#&gt; • built branch z2_275d234a
+#&gt; • start branch z2_8c730b35
+#&gt; • built branch z2_8c730b35
+#&gt; • built pattern z2
+#&gt; • start target z
+#&gt; • built target z
+#&gt; • end pipeline
+```
+
+---
+
+## Branching patterns
+
+If we read target `y` into memory, all the branches will load and automatically aggregate as a vector. [Can also use list aggregation, write `tar_target(y, w + x, pattern = map(w, x), iteration = "list")` in the pipeline.]
+
+
+```r
+tar_read(y)
+#&gt; y_61ced14d y_4096b6a8 
+#&gt;         11         22
+```
+
+--
+
+Target `z` accepts this entire aggregate of `y` and sums it.
+
+
+```r
+tar_read(z)
+#&gt; [1] 33
+```
+
+--
+
+Target `z2` maps over `y`, so each each branch of `z2` accepts a branch of `y`.
+
+
+```r
+tar_read(z2)
+#&gt; z2_275d234a z2_8c730b35 
+#&gt;           1           1
+```
+
+---
+
+## Branching patterns
+
+You can also read individual branches, which is very helpful for debugging and development.
+
+
+```r
+tar_read(z2, branches = 1)
+#&gt; z2_275d234a 
+#&gt;           1
+z2 &lt;- tar_read(z2, branches = 1)
+
+z2
+#&gt; z2_275d234a 
+#&gt;           1
+```
+
+---
+
+## Branching patterns
+
+Now you can easily run and develop some code interactively involving `z2`. 
+
+Likely, your next target will involve a function with `z2` as an argument, and it will be easy to create and develop this function now that a template argument is loaded.
+
+--
+
+
+```r
+manipulate_z2 &lt;- function(z2){
+  z2^2 
+}
+```
+
+--
+
+Once you are satisfied with your new function. You can add it to your `R/functions.R` file and add the target to the `_targets.R` document and rerun `tar_make()`.
+
+
+```r
+tar_target(
+    z2_sq,
+    manipulate_z2(z2),
+    map(z2)
+  )
+```
+
+---
+
+## Revising a branched pipeline
+
+
+
+If we add new branch(es) to the pipeline, only the new branches need to run even though the aggregate target `w` and `x` changed. 
+
+![](./images/targets_branch_changes.png)
+
+---
+
+## Revising a branched pipeline
+
+Build the updated pipeline: 
+
+
+```r
+tar_make()
+#&gt; • start target w
+#&gt; • built target w
+#&gt; • start target x
+#&gt; • built target x
+#&gt; ✓ skip branch y_61ced14d
+#&gt; ✓ skip branch y_4096b6a8
+#&gt; • start branch y_cb3cf993
+#&gt; • built branch y_cb3cf993
+#&gt; • built pattern y
+#&gt; ✓ skip branch z2_275d234a
+#&gt; ✓ skip branch z2_8c730b35
+#&gt; • start branch z2_dca71d02
+#&gt; • built branch z2_dca71d02
+#&gt; • built pattern z2
+#&gt; • start target z
+#&gt; • built target z
+#&gt; • end pipeline
+```
+
+---
+
+## Pattern construction
+
+`targets` supports the following pattern types.
+
+* `map()`: iterate over one or more targets in sequence.
+* `cross()`: iterate over combinations of slices of targets.
+* `slice()`: select individual branches slices by numeric index. For example, `pattern = slice(x, index = c(3, 4))` applies the target's command to the third and fourth slices (or branches) of upstream target `x`.
+* `head()`: restrict branching to the first few elements.
+* `tail()`: restrict branching to the last few elements.
+* `sample()`: restrict branching to a random subset of elements.
+
+---
+
+## Pattern construction
+
+These patterns can also be combined.  
+
+Below, target `z` creates six branches, one for each combination of `w` and (`x`, `y`) pair. 
+
+
+```r
+# _targets.R
+library(targets)
+list(
+  tar_target(w_comp, seq_len(2)),
+  tar_target(x_comp, head(letters, 3)),
+  tar_target(y_comp, head(LETTERS, 3)),
+  tar_target(
+    z_comp,
+    data.frame(w = w_comp, x = x_comp, y = y_comp),
+    pattern = cross(w_comp, map(x_comp, y_comp))
+  )
+)
+```
+
+---
+
+## Branching over rows of data
+
+`tarchetypes` &gt;= 0.1.0 has helpers for easy branching over subsets of data frames if you have some very large data and the rows are all independent (i.e. only do this if are doing some row-based manipulations!).
+
+* `tar_group_by()`: define row groups using `dplyr::group_by()` semantics.
+* `tar_group_select()`: define row groups using `tidyselect` semantics.
+* `tar_group_count()`: define a given number row groups.
+* `tar_group_size()`: define row groups of a given size.
+
+If you define a target with one of these functions, all downstream dynamic targets will automatically branch over the row groups.
+
+---
+
+## Debugging 
+
+There are various options for debugging within a `targets` pipeline. 
+
+Error and warning messages can be retrieved as follows: 
+
+
+```r
+tar_meta(fields = error, complete_only = TRUE)
+tar_meta(fields = warnings, complete_only = TRUE)
+```
+
+More usefully, there is also both a **debug** and **workspaces** option for interactively debugging your target that errored out. 
+
+---
+
+## Debugging with workspaces
+
+- A good option if you are running on a remote machine. 
+- Using `tar_workspace()`, you can recover a target’s workspace and locally debug it even if the pipeline is not running.
+- If you tell `targets` to record workspaces in advance, you can preempt errors and debug later at your convenience. 
+- To enable workspaces, use the `workspace_on_error` and `workspaces` arguments of `tar_option_set()`.
+
+--
+
+Specifically, at the start of your `_targets.R` file, add the line: 
+
+
+```r
+tar_option_set(workspace_on_error = TRUE)
+```
+
+Now, when (if) your pipeline throws an error, you can easily debug it interactively. 
+
+---
+
+## Debugging with workspaces
+
+An example pipeline with an error: 
+
+
+```r
+# _targets.R file:
+options(tidyverse.quiet = TRUE)
+library(targets)
+tar_option_set(workspace_on_error = TRUE, packages = "tidyverse")
+f &lt;- function(arg) {
+  stopifnot(arg &lt; 4)
+  print("Congratulations, your value is less than 4!")
+}
+list(
+  tar_target(x, seq_len(4)), # 1 2 3 4
+  tar_target(
+    y,
+    f(arg = x),
+    pattern = map(x) 
+  )
+)
+```
+
+
+
+
+---
+
+Run the pipeline: 
+
+
+```r
+tar_make()
+#&gt; • start target x
+#&gt; • built target x
+#&gt; • start branch y_29239c8a
+#&gt; [1] "Congratulations, your value is less than 4!"
+#&gt; • built branch y_29239c8a
+#&gt; • start branch y_7cc32924
+#&gt; [1] "Congratulations, your value is less than 4!"
+#&gt; • built branch y_7cc32924
+#&gt; • start branch y_bd602d50
+#&gt; [1] "Congratulations, your value is less than 4!"
+#&gt; • built branch y_bd602d50
+#&gt; • start branch y_05f206d7
+#&gt; x error branch y_05f206d7
+#&gt; • record workspace y_05f206d7
+#&gt; • end pipeline
+#&gt; Error : arg &lt; 4 is not TRUE
+#&gt; Error: callr subprocess failed: arg &lt; 4 is not TRUE
+#&gt; Visit https://books.ropensci.org/targets/debugging.html for debugging advice.
+```
+
+One of the `y_********` targets errored out. 
+
+---
+
+## Debugging with workspaces
+
+Since `y` did not build successfully, we cannot load or read it with `tar_load` or `tar_read`. 
+
+
+```r
+tar_read(x)
+#&gt; [1] 1 2 3 4
+tar_read(y)
+#&gt; Error: target y not found
+```
+
+--
+
+But we can examine and debug the error now. First, double check which target failed (branched targets have cryptic names). 
+
+
+```r
+failed &lt;- tar_meta(fields = error) %&gt;%
+  na.omit() %&gt;%
+  pull(name)
+print(failed)
+#&gt; [1] "y_05f206d7"
+```
+
+---
+
+## Debugging with workspaces
+
+Next, and more usefully, we use the `tar_workspace()` to read the special metadata in the workspace file, and load the target’s dependencies from various locations in `_targets/objects`. 
+
+--
+
+Specifically, this call will: 
+- Maintain the same random number generator seed to the same as the target (useful if you are doing simulations!). 
+- Load the required packages.
+- Runs the target script file (default: `_targets.R`) to load other global object dependencies such as functions.
+
+
+```r
+tar_workspace(y_05f206d7)
+```
+
+---
+
+## Debugging with workspaces
+
+We now have the dependencies of `y_05f206d7` in memory, which allows us to try out any failed function calls in our local R session.
+
+
+```r
+print(x)
+#&gt; [1] 4
+arg
+#&gt; Error in eval(expr, envir, enclos): object 'arg' not found
+f(3)
+#&gt; [1] "Congratulations, your value is less than 4!"
+#&gt; [1] 3
+f(x)
+#&gt; Error in f(x): arg &lt; 4 is not TRUE
+```
+
+--
+
+Now go back and edit `f()` accordingly, so it doesn't error next time. 
+
+Once `f()` has changed, `targets`, will recognize this and your next call to `tar_make()` will try and rebuild `y`.
+
+---
+
+## High-performance computing
+
+- `targets` supports high-performance computing with the `tar_make_clustermq()` and `tar_make_future()` functions. 
+
+--
+
+- These functions are like `tar_make()`, but they allow multiple targets to run simultaneously over parallel workers. 
+
+--
+
+- These workers can be processes on your local machine, or they can be jobs on a computing cluster. 
+
+--
+
+- The main process automatically sends a target to a worker as soon as:
+    - The worker is available, and
+    - All the target’s upstream dependency targets have been checked or built.
+
+---
+
+## High-performance computing with `clustermq`
+
+**First**, create a template `sbatch` file in your root directory of your project (named `slurm_clustermq.tmpl`). 
+
+
+```r
+#!/bin/sh
+# From https://github.com/mschubert/clustermq/wiki/SLURM
+#SBATCH --job-name={{ job_name }}                         # job name
+#SBATCH --partition={{ partition }}                       # partition
+#SBATCH --output={{ log_file | /dev/null }}               # you can add .%a for array index
+#SBATCH --error={{ log_file | /dev/null }}                # log file
+#SBATCH --account={{ account }}                           # account
+#SBATCH --array=1-{{ n_jobs }}                            # job array
+#SBATCH --ntasks={{ ntasks }}
+# module load R                                           # Uncomment if R is an environment module.
+
+CMQ_AUTH={{ auth }} R --no-save --no-restore -e 'clustermq:::worker("{{ master }}")'
+```
+
+---
+
+## High-performance computing with `clustermq`
+
+**Second**, add a few settings to the top of you `_targets.R` file: 
+
+
+```r
+tar_option_set(
+  resources = tar_resources(
+    clustermq = tar_resources_clustermq(template = list(num_cores = 1, account = "sgg",
+                                                        ntasks = 1, partition = "sgg",
+                                                        log_file="/data/sgg2/jenny/projects/proxyMR/proxymr_%a_clustermq.out"))
+  ),
+  packages = c("tidyverse", "data.table", "MendelianRandomization"),
+  error = "workspace",
+  memory = "transient",
+  storage = "worker",
+  garbage_collection = TRUE
+)
+```
+
+**Third**, run the pipeline as normal using:
+
+`tar_make_clustermq(workers = 10)`. (or 120+ if you want to use all the cores on the sgg nodes!)
+
+---
+
+## Summary
+
+- `targets` is an R based workflow manager which helps maintain a reproducible workflow and avoid rerunning long-running code. 
+
+--
+
+- Encourages good R practices like function-based workflows. 
+
+--
+
+- Excellent support from the maintainer on github. 
+
+--
+
+- Easy debugging. 
+
+--
+
+- Easy to scale up (i.e. add branches). 
+
+--
+
+- Seamless integration with slurm (no more creating `sbatch` files!).
+
+--
+
+- Good integration with `renv` (R package manager).
+
+--
+
+- Many other features I didn't mention! (including branch integration in github, multiple helpful features with R markdown documents, watch progress live with shiny).  
+
+--
+
+- **Considerations**: time-consuming to reformat your project if you are in the middle of a project, otherwise no real cons :) 
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
